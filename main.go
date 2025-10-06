@@ -16,6 +16,9 @@ import (
 	"time"
 )
 
+// Version information (set by build flags)
+var version = "dev"
+
 type Config struct {
 	Target      string
 	InsecureSSL bool
@@ -25,13 +28,16 @@ type Config struct {
 
 func main() {
 	var config Config
+	var showVersion bool
+	
 	flag.StringVar(&config.Target, "target", "", "Target server (server:port, protocol://server, or just server)")
 	flag.BoolVar(&config.InsecureSSL, "insecure", false, "Skip certificate verification")
 	flag.DurationVar(&config.Timeout, "timeout", 10*time.Second, "Connection timeout")
 	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&showVersion, "version", false, "Show version information")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "SSL Certificate Extractor\n\n")
+		fmt.Fprintf(os.Stderr, "SSL Certificate Extractor %s\n\n", version)
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] target\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Creates a certificate bundle file (server_bundle.pem) containing all certificates\n")
 		fmt.Fprintf(os.Stderr, "in the chain that can be used with curl, wget, and other SSL/TLS clients.\n\n")
@@ -51,6 +57,11 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("SSL Certificate Extractor version %s\n", version)
+		os.Exit(0)
+	}
 
 	if flag.NArg() > 0 {
 		config.Target = flag.Arg(0)

@@ -1,6 +1,52 @@
 # SSL Certificate Extractor
 
-Scripts to connect to an SSL service and extract its certificates, creating a certificate bundle that can be used with curl and other SSL/TLS clients.
+A collection of tools to connect to SSL services and extract their certificates, creating certificate bundles that can be used with curl and other SSL/TLS clients.
+
+## 🚀 Go Application (Recommended)
+
+The Go application provides a standalone binary with no dependencies (no OpenSSL required):
+
+### Installation
+
+#### Download Pre-built Binaries
+Download the latest release from the [releases page](https://github.com/vehub/ca-bundle/releases):
+
+- **Linux**: `sslcerts-linux-amd64.tar.gz` or `sslcerts-linux-arm64.tar.gz`
+- **macOS**: `sslcerts-macos-amd64.tar.gz` or `sslcerts-macos-arm64.tar.gz`
+- **Windows**: `sslcerts-windows-amd64.zip` or `sslcerts-windows-arm64.zip`
+
+#### Build from Source
+```bash
+git clone https://github.com/vehub/ca-bundle.git
+cd ca-bundle
+make build
+```
+
+### Go Application Usage
+```bash
+# Basic usage
+./sslcerts example.com
+
+# With custom port
+./sslcerts example.com:8443
+
+# Protocol with URL format
+./sslcerts https://github.com
+./sslcerts smtp://smtp.gmail.com:587
+
+# Skip certificate verification (for self-signed certs)
+./sslcerts -insecure self-signed.example.com
+
+# Verbose output
+./sslcerts -verbose example.com
+
+# Show version
+./sslcerts -version
+```
+
+## 📜 Legacy Scripts
+
+For systems where Go binaries are not suitable, shell/batch scripts are also provided:
 
 ## Usage
 
