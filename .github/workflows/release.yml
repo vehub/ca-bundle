@@ -1,0 +1,217 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v2.1.3, etc.
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary_suffix: ""
+            asset_name: sslcerts-linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary_suffix: ""
+            asset_name: sslcerts-linux-arm64
+          
+          # macOS builds
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary_suffix: ""
+            asset_name: sslcerts-macos-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary_suffix: ""
+            asset_name: sslcerts-macos-arm64
+          
+          # Windows builds
+          - os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+            binary_suffix: ".exe"
+            asset_name: sslcerts-windows-amd64.exe
+          - os: ubuntu-latest
+            goos: windows
+            goarch: arm64
+            binary_suffix: ".exe"
+            asset_name: sslcerts-windows-arm64.exe
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Get dependencies
+      run: go mod download
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o sslcerts${{ matrix.binary_suffix }} main.go
+
+    - name: Create release package
+      run: |
+        mkdir -p release
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          # Windows package with batch and PowerShell scripts
+          cp sslcerts${{ matrix.binary_suffix }} release/
+          cp sslcerts.bat release/
+          cp sslcerts.ps1 release/
+          cp README.md release/
+          cd release && zip -r ../sslcerts-${{ matrix.goos }}-${{ matrix.goarch }}.zip .
+        else
+          # Unix package with shell script
+          cp sslcerts${{ matrix.binary_suffix }} release/
+          cp sslcerts.sh release/
+          cp README.md release/
+          cd release && tar -czf ../sslcerts-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz .
+        fi
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.asset_name }}
+        path: |
+          sslcerts-${{ matrix.goos }}-${{ matrix.goarch }}.*
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Display structure of downloaded files
+      run: ls -la
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: SSL Certificate Extractor ${{ github.ref_name }}
+        body: |
+          ## SSL Certificate Extractor ${{ github.ref_name }}
+
+          ### 🚀 Features
+          - Extract SSL certificates from any server without OpenSSL dependency
+          - Support for HTTPS, SMTP, IMAP, POP3 with STARTTLS
+          - Creates certificate bundles compatible with curl, wget, and other tools
+          - Cross-platform: Windows, macOS, and Linux
+
+          ### 📦 Downloads
+          Choose the appropriate binary for your platform:
+
+          - **Linux**: `sslcerts-linux-amd64.tar.gz` or `sslcerts-linux-arm64.tar.gz`
+          - **macOS**: `sslcerts-macos-amd64.tar.gz` or `sslcerts-macos-arm64.tar.gz` 
+          - **Windows**: `sslcerts-windows-amd64.zip` or `sslcerts-windows-arm64.zip`
+
+          ### 🔧 Usage
+          ```bash
+          # Basic usage
+          ./sslcerts example.com
+          
+          # With custom port
+          ./sslcerts example.com:8443
+          
+          # SMTP with STARTTLS
+          ./sslcerts smtp://smtp.gmail.com:587
+          
+          # Skip certificate verification
+          ./sslcerts -insecure self-signed.example.com
+          ```
+
+          ### 📋 What's included
+          - Go binary (standalone, no dependencies)
+          - Legacy shell/batch scripts for comparison
+          - Documentation
+        draft: false
+        prerelease: false
+
+    - name: Upload Linux AMD64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./sslcerts-linux-amd64/sslcerts-linux-amd64.tar.gz
+        asset_name: sslcerts-linux-amd64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload Linux ARM64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./sslcerts-linux-arm64/sslcerts-linux-arm64.tar.gz
+        asset_name: sslcerts-linux-arm64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload macOS AMD64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./sslcerts-macos-amd64/sslcerts-darwin-amd64.tar.gz
+        asset_name: sslcerts-macos-amd64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload macOS ARM64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./sslcerts-macos-arm64/sslcerts-darwin-arm64.tar.gz
+        asset_name: sslcerts-macos-arm64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload Windows AMD64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./sslcerts-windows-amd64.exe/sslcerts-windows-amd64.zip
+        asset_name: sslcerts-windows-amd64.zip
+        asset_content_type: application/zip
+
+    - name: Upload Windows ARM64 Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./sslcerts-windows-arm64.exe/sslcerts-windows-arm64.zip
+        asset_name: sslcerts-windows-arm64.zip
+        asset_content_type: application/zip
